@@ -138,6 +138,33 @@ static CDVWKInAppBrowser* instance = nil;
     CDVInAppBrowserOptions* browserOptions = [CDVInAppBrowserOptions parseOptions:options];
     
     WKWebsiteDataStore* dataStore = [WKWebsiteDataStore defaultDataStore];
+    if(browserOptions.cookiestring) {
+            browserOptions.cookiestring = [browserOptions.cookiestring stringByReplacingOccurrencesOfString:@";"
+                                                 withString:@","];
+            NSError *jsonError;
+            NSData *objectData = [browserOptions.cookiestring dataUsingEncoding:NSUTF8StringEncoding];
+            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:objectData
+                                                  options:NSJSONReadingMutableContainers
+                                                    error:&jsonError];
+            
+            NSMutableDictionary *cookieProperties = [NSMutableDictionary dictionary];
+            [cookieProperties setObject:json[@"name"] forKey:NSHTTPCookieName];
+            [cookieProperties setObject:json[@"value"] forKey:NSHTTPCookieValue];
+            [cookieProperties setObject:json[@"urlString"] forKey:NSHTTPCookieOriginURL];
+            [cookieProperties setObject:@"/" forKey:NSHTTPCookiePath];
+
+            NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties:cookieProperties];
+            
+            if (@available(iOS 11.0, *)) {
+                [dataStore.httpCookieStore setCookie:cookie completionHandler:^{NSLog(@"Cookie set in WKWebView");
+                    [dataStore.httpCookieStore getAllCookies:^(NSArray<NSHTTPCookie *> * cookie) {
+                        NSLog(@"cookie: %@", cookie);
+                        
+                    }];
+                }];
+            }
+        }
+    
     if (browserOptions.cleardata) {
         
         NSDate* dateFrom = [NSDate dateWithTimeIntervalSince1970:0];
