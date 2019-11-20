@@ -117,6 +117,8 @@ public class InAppBrowser extends CordovaPlugin {
     private static final String FOOTER = "footer";
     private static final String FOOTER_COLOR = "footercolor";
     private static final String BEFORELOAD = "beforeload";
+    private static final String COOKIE = "cookieString";
+
 
     private static final List customizableOptions = Arrays.asList(CLOSE_BUTTON_CAPTION, TOOLBAR_COLOR, NAVIGATION_COLOR, CLOSE_BUTTON_COLOR, FOOTER_COLOR);
 
@@ -129,6 +131,7 @@ public class InAppBrowser extends CordovaPlugin {
     private boolean openWindowHidden = false;
     private boolean clearAllCache = false;
     private boolean clearSessionCache = false;
+    private String cookieString = null;
     private boolean hadwareBackButton = true;
     private boolean mediaPlaybackRequiresUserGesture = false;
     private boolean shouldPauseInAppBrowser = false;
@@ -634,6 +637,7 @@ public class InAppBrowser extends CordovaPlugin {
         mediaPlaybackRequiresUserGesture = false;
 
         if (features != null) {
+            cookieString = features.get(COOKIE);
             String show = features.get(LOCATION);
             if (show != null) {
                 showLocationBar = show.equals("yes") ? true : false;
@@ -1027,6 +1031,22 @@ public class InAppBrowser extends CordovaPlugin {
                 // Enable Thirdparty Cookies on >=Android 5.0 device
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
                     CookieManager.getInstance().setAcceptThirdPartyCookies(inAppWebView,true);
+                }
+
+                if (cookieString != null) {
+                    try {
+                        JSONObject obj = new JSONObject(cookieString.replaceAll(";", ","));
+                        String cookie = obj.getString("name") + "=" + obj.getString("value");
+                        if (obj.has("secure")) {
+                            cookie += "; Secure";
+                        }
+                        if (obj.has("sameSite")) {
+                            cookie += "; SameSite=" + obj.getString("sameSite");
+                        }
+                        CookieManager.getInstance().setCookie(obj.getString("urlString"), cookie);
+                    } catch (Exception e) {
+                        System.out.println(e);
+                    }
                 }
 
                 inAppWebView.loadUrl(url);
