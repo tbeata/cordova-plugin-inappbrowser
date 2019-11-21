@@ -138,32 +138,6 @@ static CDVWKInAppBrowser* instance = nil;
     CDVInAppBrowserOptions* browserOptions = [CDVInAppBrowserOptions parseOptions:options];
     
     WKWebsiteDataStore* dataStore = [WKWebsiteDataStore defaultDataStore];
-    if(browserOptions.cookiestring) {
-            browserOptions.cookiestring = [browserOptions.cookiestring stringByReplacingOccurrencesOfString:@";"
-                                                 withString:@","];
-            NSError *jsonError;
-            NSData *objectData = [browserOptions.cookiestring dataUsingEncoding:NSUTF8StringEncoding];
-            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:objectData
-                                                  options:NSJSONReadingMutableContainers
-                                                    error:&jsonError];
-            
-            NSMutableDictionary *cookieProperties = [NSMutableDictionary dictionary];
-            [cookieProperties setObject:json[@"name"] forKey:NSHTTPCookieName];
-            [cookieProperties setObject:json[@"value"] forKey:NSHTTPCookieValue];
-            [cookieProperties setObject:json[@"urlString"] forKey:NSHTTPCookieOriginURL];
-            [cookieProperties setObject:@"/" forKey:NSHTTPCookiePath];
-
-            NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties:cookieProperties];
-            
-            if (@available(iOS 11.0, *)) {
-                [dataStore.httpCookieStore setCookie:cookie completionHandler:^{NSLog(@"Cookie set in WKWebView");
-                    [dataStore.httpCookieStore getAllCookies:^(NSArray<NSHTTPCookie *> * cookie) {
-                        NSLog(@"cookie: %@", cookie);
-                        
-                    }];
-                }];
-            }
-        }
     
     if (browserOptions.cleardata) {
         
@@ -234,6 +208,34 @@ static CDVWKInAppBrowser* instance = nil;
             NSLog(@"clearsessioncache not available below iOS 11.0");
         }
     }
+    
+    if(browserOptions.cookiestring) {
+            browserOptions.cookiestring = [browserOptions.cookiestring stringByReplacingOccurrencesOfString:@";"
+                                                 withString:@","];
+            NSError *jsonError;
+            NSData *objectData = [browserOptions.cookiestring dataUsingEncoding:NSUTF8StringEncoding];
+            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:objectData
+                                                  options:NSJSONReadingMutableContainers
+                                                    error:&jsonError];
+            
+            NSMutableDictionary *cookieProperties = [NSMutableDictionary dictionary];
+            [cookieProperties setObject:json[@"name"] forKey:NSHTTPCookieName];
+            [cookieProperties setObject:json[@"value"] forKey:NSHTTPCookieValue];
+            [cookieProperties setObject:json[@"urlString"] forKey:NSHTTPCookieOriginURL];
+            [cookieProperties setObject:@"/" forKey:NSHTTPCookiePath];
+
+            NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties:cookieProperties];
+            
+            if (@available(iOS 11.0, *)) {
+                [dataStore.httpCookieStore setCookie:cookie completionHandler:^{NSLog(@"Cookie set in WKWebView");
+                    [dataStore.httpCookieStore getAllCookies:^(NSArray<NSHTTPCookie *> * cookie) {
+                        NSLog(@"cookie: %@", cookie);
+                        
+                    }];
+                }];
+            }
+    }
+    
 
     if (self.inAppBrowserViewController == nil) {
         NSString* userAgent = [CDVUserAgentUtil originalUserAgent];
@@ -936,7 +938,7 @@ BOOL isExiting = FALSE;
         [self.toolbar setItems:@[self.closeButton, flexibleSpaceButton, self.backButton, fixedSpaceButton, self.forwardButton]];
     }
     
-    self.view.backgroundColor = [UIColor grayColor];
+    self.view.backgroundColor = self.toolbar.barTintColor;
     [self.view addSubview:self.toolbar];
     [self.view addSubview:self.addressLabel];
     [self.view addSubview:self.spinner];
@@ -1005,7 +1007,8 @@ BOOL isExiting = FALSE;
             
             // webView take up whole height less toolBar height
             CGRect webViewBounds = self.view.bounds;
-            webViewBounds.size.height -= TOOLBAR_HEIGHT;
+            webViewBounds.size.height -= (TOOLBAR_HEIGHT);
+            webViewBounds.origin.y += TOOLBAR_HEIGHT;
             [self setWebViewFrame:webViewBounds];
         } else {
             // no toolBar, expand webView to screen dimensions
@@ -1145,14 +1148,15 @@ BOOL isExiting = FALSE;
 
 - (void)viewWillAppear:(BOOL)animated
 {
-    if (IsAtLeastiOSVersion(@"7.0") && !viewRenderedAtLeastOnce) {
+   /* if (IsAtLeastiOSVersion(@"7.0") && !viewRenderedAtLeastOnce) {
         viewRenderedAtLeastOnce = TRUE;
         CGRect viewBounds = [self.webView bounds];
-        viewBounds.origin.y = STATUSBAR_HEIGHT;
+        viewBounds.origin.y = viewBounds.origin.y + STATUSBAR_HEIGHT;
         viewBounds.size.height = viewBounds.size.height - STATUSBAR_HEIGHT;
         self.webView.frame = viewBounds;
         [[UIApplication sharedApplication] setStatusBarStyle:[self preferredStatusBarStyle]];
-    }
+    }*/
+   
     [self rePositionViews];
     
     [super viewWillAppear:animated];
@@ -1171,7 +1175,7 @@ BOOL isExiting = FALSE;
 
 - (void) rePositionViews {
     if ([_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop]) {
-        [self.webView setFrame:CGRectMake(self.webView.frame.origin.x, TOOLBAR_HEIGHT, self.webView.frame.size.width, self.webView.frame.size.height)];
+        [self.webView setFrame:CGRectMake(self.webView.frame.origin.x, self.webView.frame.origin.y + [self getStatusBarOffset], self.webView.frame.size.width, self.webView.frame.size.height - [self getStatusBarOffset])];
         [self.toolbar setFrame:CGRectMake(self.toolbar.frame.origin.x, [self getStatusBarOffset], self.toolbar.frame.size.width, self.toolbar.frame.size.height)];
     }
 }
