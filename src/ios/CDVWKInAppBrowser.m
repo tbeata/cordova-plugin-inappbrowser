@@ -161,9 +161,16 @@ static CDVWKInAppBrowser* instance = nil;
             // Deletes all cookies
             WKHTTPCookieStore* cookieStore = dataStore.httpCookieStore;
             [cookieStore getAllCookies:^(NSArray* cookies) {
-                NSHTTPCookie* cookie;
-                for(cookie in cookies){
-                    [cookieStore deleteCookie:cookie completionHandler:nil];
+                if (cookies.count > 0) {
+                    NSHTTPCookie* cookie;
+                    for(cookie in cookies) {
+                        [cookieStore deleteCookie:cookie completionHandler:^{
+                            NSLog(@"Old cookies removed");
+                            [self setCookiesFromBrowserOptions:browserOptions];
+                        }];
+                    }
+                } else {
+                    [self setCookiesFromBrowserOptions:browserOptions];
                 }
             }];
 #endif
@@ -196,44 +203,24 @@ static CDVWKInAppBrowser* instance = nil;
             // Deletes session cookies
             WKHTTPCookieStore* cookieStore = dataStore.httpCookieStore;
             [cookieStore getAllCookies:^(NSArray* cookies) {
-                NSHTTPCookie* cookie;
-                for(cookie in cookies){
-                    if(cookie.sessionOnly){
-                        [cookieStore deleteCookie:cookie completionHandler:nil];
+                if (cookies.count > 0) {
+                    NSHTTPCookie* cookie;
+                    for(cookie in cookies) {
+                        if(cookie.sessionOnly){
+                            [cookieStore deleteCookie:cookie completionHandler:^{
+                                NSLog(@"Cookie removed in WKWebView");
+                                [self setCookiesFromBrowserOptions:browserOptions];
+                            }];
+                        }
                     }
+                } else {
+                    [self setCookiesFromBrowserOptions:browserOptions];
                 }
             }];
 #endif
         }else{
             NSLog(@"clearsessioncache not available below iOS 11.0");
         }
-    }
-    
-    if(browserOptions.cookiestring) {
-            browserOptions.cookiestring = [browserOptions.cookiestring stringByReplacingOccurrencesOfString:@";"
-                                                 withString:@","];
-            NSError *jsonError;
-            NSData *objectData = [browserOptions.cookiestring dataUsingEncoding:NSUTF8StringEncoding];
-            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:objectData
-                                                  options:NSJSONReadingMutableContainers
-                                                    error:&jsonError];
-            
-            NSMutableDictionary *cookieProperties = [NSMutableDictionary dictionary];
-            [cookieProperties setObject:json[@"name"] forKey:NSHTTPCookieName];
-            [cookieProperties setObject:json[@"value"] forKey:NSHTTPCookieValue];
-            [cookieProperties setObject:json[@"urlString"] forKey:NSHTTPCookieOriginURL];
-            [cookieProperties setObject:@"/" forKey:NSHTTPCookiePath];
-
-            NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties:cookieProperties];
-            
-            if (@available(iOS 11.0, *)) {
-                [dataStore.httpCookieStore setCookie:cookie completionHandler:^{NSLog(@"Cookie set in WKWebView");
-                    [dataStore.httpCookieStore getAllCookies:^(NSArray<NSHTTPCookie *> * cookie) {
-                        NSLog(@"cookie: %@", cookie);
-                        
-                    }];
-                }];
-            }
     }
     
 
@@ -308,6 +295,37 @@ static CDVWKInAppBrowser* instance = nil;
     if (!browserOptions.hidden) {
         [self show:nil withNoAnimate:browserOptions.hidden];
     }
+}
+
+- (void)setCookiesFromBrowserOptions:(CDVInAppBrowserOptions *)browserOptions {
+    if (browserOptions.cookiestring) {
+        WKWebsiteDataStore* dataStore = [WKWebsiteDataStore defaultDataStore];
+
+        NSError *jsonError;
+        NSData *objectData = [[browserOptions.cookiestring stringByReplacingOccurrencesOfString:@";"
+        withString:@","] dataUsingEncoding:NSUTF8StringEncoding];
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:objectData
+                                              options:NSJSONReadingMutableContainers
+                                                error:&jsonError];
+        
+        NSMutableDictionary *cookieProperties = [NSMutableDictionary dictionary];
+        [cookieProperties setObject:json[@"name"] forKey:NSHTTPCookieName];
+        [cookieProperties setObject:json[@"value"] forKey:NSHTTPCookieValue];
+        [cookieProperties setObject:json[@"urlString"] forKey:NSHTTPCookieOriginURL];
+        [cookieProperties setObject:@"/" forKey:NSHTTPCookiePath];
+
+        NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties:cookieProperties];
+        
+        if (@available(iOS 11.0, *)) {
+            [dataStore.httpCookieStore setCookie:cookie completionHandler:^{NSLog(@"Cookie set in WKWebView");
+                [dataStore.httpCookieStore getAllCookies:^(NSArray<NSHTTPCookie *> * cookie) {
+                    NSLog(@"cookie: %@", cookie);
+                    
+                }];
+            }];
+        }
+    }
+    
 }
 
 - (void)show:(CDVInvokedUrlCommand*)command{
